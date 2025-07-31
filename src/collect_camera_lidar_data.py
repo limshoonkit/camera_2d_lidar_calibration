@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
-import rospy
+import rclpy
+from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
@@ -23,12 +24,13 @@ fig = None
 
 sub_img = np.array([])
 
-class matplot:
+class Matplot:
 
-    def __init__(self):
+    def __init__(self, output_file):
         global alpha, beta
         alpha = 1.0
         beta = 0
+        self.output_file = output_file
         self.create_figure()
             
     def create_figure(self):
@@ -65,7 +67,7 @@ class matplot:
             else:
                 print('Image coordinate: (%d, %d), Laser coordinate: (%f, %f)' % (u, v, x, y))
                 plt.close()
-                with open(output_file, 'a') as f:
+                with open(self.output_file, 'a') as f:
                     f.write('%f %f %d %d\n' % (x, y, u, v))
                 u, v = None, None
         elif event.key in ['up','down','pageup','pagedown']:
@@ -105,44 +107,61 @@ def image_cb(msg):
 def Shutdown():
     plt.close()
 
-rospy.init_node('collect_camera_lidar_data')
-rospy.on_shutdown(Shutdown)
-image_topic = rospy.get_param('~image_topic')
-config_file = rospy.get_param('~config_file')
-output_file = rospy.get_param('~output_file')   
-sub1 = rospy.Subscriber('/move_base_simple/goal', PoseStamped, point_cb)
-sub2 = rospy.Subscriber(image_topic, Image, image_cb)
-bridge = CvBridge()
+class CollectCameraLidarDataNode(Node):
+    def __init__(self):
+        super().__init__('collect_camera_lidar_data')
+        self.declare_parameter('image_topic', '/camera/image_raw')
+        self.declare_parameter('config_file', 'config/config.yaml')
+        self.declare_parameter('output_file', 'data/data.txt')
+        image_topic = self.get_parameter('image_topic').get_parameter_value().string_value
+        config_file = self.get_parameter('config_file').get_parameter_value().string_value
+        self.output_file = self.get_parameter('output_file').get_parameter_value().string_value
+        self.sub1 = self.create_subscription(PoseStamped, '/move_base_simple/goal', point_cb, 10)
+        self.sub2 = self.create_subscription(Image, image_topic, image_cb, 10)
+        global bridge
+        bridge = CvBridge()
+        with open(config_file, 'r') as f:
+            f.readline()
+            config = yaml.load(f, Loader=yaml.SafeLoader)
+            global lens, K, D, fx, fy, cx, cy, k1, k2, p1, p2
+            lens = config['lens']
+            fx = float(config['fx'])
+            fy = float(config['fy'])
+            cx = float(config['cx'])
+            cy = float(config['cy'])
+            k1 = float(config['k1'])
+            k2 = float(config['k2'])
+            p1 = float(config['p1/k3'])
+            p2 = float(config['p2/k4'])
+        if lens not in ['pinhole', 'fisheye']:
+            print('Invalid lens, using pinhole as default.')
+            lens = 'pinhole'
+        K = np.matrix([[fx, 0.0, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]])
+        D = np.array([k1, k2, p1, p2])
+        print("Camera parameters")
+        print("Lens = %s" % lens)
+        print("K =")
+        print(K)
+        print("D =")
+        print(D)
+        self.timer = self.create_timer(1.0/30.0, self.timer_callback)
+    def timer_callback(self):
+        global clicked
+        if clicked:
+            Matplot(self.output_file)
+            clicked = False
 
-with open(config_file, 'r') as f:
-    f.readline()
-    config = yaml.load(f)
-    lens = config['lens']
-    fx = float(config['fx'])
-    fy = float(config['fy'])
-    cx = float(config['cx'])
-    cy = float(config['cy'])
-    k1 = float(config['k1'])
-    k2 = float(config['k2'])
-    p1 = float(config['p1/k3'])
-    p2 = float(config['p2/k4'])
-if lens not in ['pinhole', 'fisheye']:
-    print('Invalid lens, using pinhole as default.')
-    lens = 'pinhole'
-K = np.matrix([[fx, 0.0, cx],
-               [0.0, fy, cy],
-               [0.0, 0.0, 1.0]])
-D = np.array([k1, k2, p1, p2])
-print("Camera parameters")
-print("Lens = %s" % lens)
-print("K =")
-print(K)
-print("D =")
-print(D)
+def main(args=None):
+    rclpy.init(args=args)
+    node = CollectCameraLidarDataNode()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+        Shutdown()
 
-rate = rospy.Rate(30)
-while not rospy.is_shutdown():
-    if clicked:
-        matplot()
-        clicked = False
-    rate.sleep()
+if __name__ == '__main__':
+    main()
