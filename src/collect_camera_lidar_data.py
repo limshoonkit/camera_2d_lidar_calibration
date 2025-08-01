@@ -110,7 +110,7 @@ def Shutdown():
 class CollectCameraLidarDataNode(Node):
     def __init__(self):
         super().__init__('collect_camera_lidar_data')
-        self.declare_parameter('image_topic', '/camera/image_raw')
+        self.declare_parameter('image_topic', '/zed_node/left_raw/image_raw_color')
         self.declare_parameter('config_file', 'config/config.yaml')
         self.declare_parameter('output_file', 'data/data.txt')
         image_topic = self.get_parameter('image_topic').get_parameter_value().string_value

@@ -11,7 +11,7 @@ def generate_launch_description():
             name='collect_camera_lidar_data',
             output='screen',
             parameters=[
-                {'image_topic': '/camera/image_raw'},
+                {'image_topic': '/zed_node/left_raw/image_raw_color'},
                 {'config_file': 'config/config.yaml'},
                 {'output_file': 'data/data.txt'}
             ]

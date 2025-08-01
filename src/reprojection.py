@@ -29,7 +29,7 @@ class ReprojectionNode(Node):
     def __init__(self):
         super().__init__('reprojection')
         self.declare_parameter('scan_topic', '/scan')
-        self.declare_parameter('image_topic', '/camera/image_raw')
+        self.declare_parameter('image_topic', '/zed_node/left_raw/image_raw_color')
         self.declare_parameter('calib_file', 'data/calibration_result.txt')
         self.declare_parameter('config_file', 'config/config.yaml')
         self.declare_parameter('laser_point_radius', 3)

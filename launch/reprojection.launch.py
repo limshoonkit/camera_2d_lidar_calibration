@@ -12,7 +12,7 @@ def generate_launch_description():
             output='screen',
             parameters=[
                 {'scan_topic': '/scan'},
-                {'image_topic': '/camera/image_raw'},
+                {'image_topic': '/zed_node/left_raw/image_raw_color'},
                 {'calib_file': 'data/calibration_result.txt'},
                 {'config_file': 'config/config.yaml'},
                 {'laser_point_radius': 3},
