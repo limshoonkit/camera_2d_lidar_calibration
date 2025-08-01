@@ -8,7 +8,6 @@ from cv_bridge import CvBridge, CvBridgeError
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2
-import yaml
 
 u = None
 v = None
@@ -110,41 +109,54 @@ def Shutdown():
 class CollectCameraLidarDataNode(Node):
     def __init__(self):
         super().__init__('collect_camera_lidar_data')
-        self.declare_parameter('image_topic', '/zed_node/left_raw/image_raw_color')
-        self.declare_parameter('config_file', 'config/config.yaml')
+        self.declare_parameter('image_topic', '/camera/image_raw')
         self.declare_parameter('output_file', 'data/data.txt')
+        
+        # Declare and get parameters for camera calibration
+        self.declare_parameter('lens', 'pinhole')
+        self.declare_parameter('fx', 0.0)
+        self.declare_parameter('fy', 0.0)
+        self.declare_parameter('cx', 0.0)
+        self.declare_parameter('cy', 0.0)
+        self.declare_parameter('k1', 0.0)
+        self.declare_parameter('k2', 0.0)
+        self.declare_parameter('p1', 0.0)
+        self.declare_parameter('p2', 0.0)
+
         image_topic = self.get_parameter('image_topic').get_parameter_value().string_value
-        config_file = self.get_parameter('config_file').get_parameter_value().string_value
         self.output_file = self.get_parameter('output_file').get_parameter_value().string_value
-        self.sub1 = self.create_subscription(PoseStamped, '/move_base_simple/goal', point_cb, 10)
-        self.sub2 = self.create_subscription(Image, image_topic, image_cb, 10)
         global bridge
         bridge = CvBridge()
-        with open(config_file, 'r') as f:
-            f.readline()
-            config = yaml.load(f, Loader=yaml.SafeLoader)
-            global lens, K, D, fx, fy, cx, cy, k1, k2, p1, p2
-            lens = config['lens']
-            fx = float(config['fx'])
-            fy = float(config['fy'])
-            cx = float(config['cx'])
-            cy = float(config['cy'])
-            k1 = float(config['k1'])
-            k2 = float(config['k2'])
-            p1 = float(config['p1/k3'])
-            p2 = float(config['p2/k4'])
+        global lens, K, D
+        
+        lens = self.get_parameter('lens').get_parameter_value().string_value
+        fx = self.get_parameter('fx').get_parameter_value().double_value
+        fy = self.get_parameter('fy').get_parameter_value().double_value
+        cx = self.get_parameter('cx').get_parameter_value().double_value
+        cy = self.get_parameter('cy').get_parameter_value().double_value
+        k1 = self.get_parameter('k1').get_parameter_value().double_value
+        k2 = self.get_parameter('k2').get_parameter_value().double_value
+        p1 = self.get_parameter('p1').get_parameter_value().double_value
+        p2 = self.get_parameter('p2').get_parameter_value().double_value
+        
+        # Re-initialize the K and D matrices with the retrieved parameters
         if lens not in ['pinhole', 'fisheye']:
-            print('Invalid lens, using pinhole as default.')
+            self.get_logger().info('Invalid lens, using pinhole as default.')
             lens = 'pinhole'
+        
         K = np.matrix([[fx, 0.0, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]])
         D = np.array([k1, k2, p1, p2])
-        print("Camera parameters")
-        print("Lens = %s" % lens)
-        print("K =")
-        print(K)
-        print("D =")
-        print(D)
+        
+        self.get_logger().info("Camera parameters")
+        self.get_logger().info("Lens = %s" % lens)
+        self.get_logger().info("K =\n%s" % K)
+        self.get_logger().info("D = %s" % D)
+
+        self.sub1 = self.create_subscription(PoseStamped, '/goal_pose', point_cb, 10)
+        self.sub2 = self.create_subscription(Image, image_topic, image_cb, 10)
+        
         self.timer = self.create_timer(1.0/30.0, self.timer_callback)
+
     def timer_callback(self):
         global clicked
         if clicked:
