@@ -15,7 +15,7 @@ source install/setup.bash
 ros2 launch camera_2d_lidar_calibration collect_camera_lidar_data.launch.py
 ```
 
-2. 
+2. Result output format: qx qy qz qw tx ty tz
 ```
 ros2 launch camera_2d_lidar_calibration calibration.launch.py
 ```
@@ -24,3 +24,5 @@ ros2 launch camera_2d_lidar_calibration calibration.launch.py
 ```
 ros2 launch camera_2d_lidar_calibration reprojection.launch.py
 ```
+
+![Example setup](example.png) 
